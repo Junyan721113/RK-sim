@@ -1,6 +1,5 @@
 const PX_PER_M = (1080 / 19.4) * 100;
 const DELTA_T = 0.01; //s
-const NODE_SIZE = 10;
 const ZOOM_RATIO = 100;
 
 class Vector {
@@ -46,7 +45,7 @@ class Vector {
 }
 
 class node {
-	constructor(dim, R, V, m, minR, maxR, PARENT) {
+	constructor(dim, R, V, m, minR, maxR, CANVAS) {
 		this.dim = dim;
 		//[R, V, m]
 		this.X = new Vector(
@@ -58,23 +57,13 @@ class node {
 		this.maxR = new Vector(maxR).mulk(ZOOM_RATIO / PX_PER_M);
 		this.forceList = new Array();
 
-		this.init(PARENT);
+		this.CANVAS = CANVAS;
+		this.disp();
 		this.itv = setInterval(this.Next, DELTA_T * 1000);
 	}
 
 	addForce = (F) => {
 		this.forceList.push(F);
-	};
-
-	init = (PARENT) => {
-		this.DOM = document.createElement("div");
-		PARENT.appendChild(this.DOM);
-		this.DOM.style.position = "relative";
-		this.DOM.style.width = NODE_SIZE + "px";
-		this.DOM.style.height = NODE_SIZE + "px";
-		this.DOM.style.background = "#000";
-		this.DOM.style.borderRadius = NODE_SIZE / 2 + "px";
-		this.disp();
 	};
 
 	dv_dt = (t, X) => {
@@ -117,11 +106,18 @@ class node {
 	};
 
 	disp = () => {
-		this.DOM.style.left =
-			(this.X.dat[0].dat[0] * PX_PER_M) / ZOOM_RATIO - NODE_SIZE / 2 + "px";
-		this.DOM.style.top =
-			(this.X.dat[0].dat[1] * PX_PER_M) / ZOOM_RATIO - NODE_SIZE / 2 + "px";
+		this.circ(this.X.dat[0].dat[0] * PX_PER_M / ZOOM_RATIO, this.X.dat[0].dat[1] * PX_PER_M / ZOOM_RATIO, 1.0)
 	};
+
+	circ = (x, y, r) => {
+        this.CANVAS.lineWidth = 1;
+        this.CANVAS.lineCap = "round";
+		this.CANVAS.beginPath();
+		this.CANVAS.arc(x, y, r, 0, 2 * Math.PI);
+		this.CANVAS.closePath();
+		this.CANVAS.strokeStyle = "black";
+		this.CANVAS.stroke();
+	}
 
 	isOut = () => {
 		for (let i = 0; i < this.dim; i++)
@@ -155,7 +151,7 @@ const Tension = (R, l) => (t, X, m) => {
 	let tie = R.mulk(ZOOM_RATIO);
 	let len = l * ZOOM_RATIO;
 	let dis = tie.sub(X.dat[0]);
-	return dis.mulk((dis.abs() - len) * 1000);
+	return dis.mulk((dis.abs() - len) * 100);
 };
 
 class space {
@@ -164,13 +160,14 @@ class space {
 	}
 
 	init = (x, y) => {
-		this.DOM = document.createElement("div");
+		this.DOM = document.createElement("canvas");
 		document.body.appendChild(this.DOM);
 		this.DOM.style.position = "relative";
-		this.DOM.style.top = "100px";
-		this.DOM.style.left = "100px";
-		this.DOM.style.width = (this.x = x) + "px";
-		this.DOM.style.height = (this.y = y) + "px";
+		this.DOM.style.top = "0px";
+		this.DOM.style.left = "0px";
+		this.DOM.width = this.x = x;
+		this.DOM.height = this.y = y;
+		this.DOM.style.border = "dashed 2px #CCC";
 		this.DOM.style.background = "#EEE";
 
 		this.dim = 2;
@@ -181,7 +178,7 @@ class space {
 			1, //m: kg
 			new Array(0, 0), //minR: px
 			new Array(this.x, this.y), //maxR: px
-			this.DOM
+			this.DOM.getContext("2d")
 		);
 		let point2 = new node(
 			this.dim,
@@ -190,7 +187,7 @@ class space {
 			1,
 			new Array(0, 0),
 			new Array(this.x, this.y),
-			this.DOM
+			this.DOM.getContext("2d")
 		);
 		point1.addForce(Gravity_Y);
 		point1.addForce(Tension(new Vector(new Array(0.05, 0.03)), 0.02));
@@ -198,5 +195,5 @@ class space {
 }
 
 onload = () => {
-	let back = new space(640, 640);
+	let back = new space(800, 640);
 };
