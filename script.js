@@ -1,5 +1,5 @@
 const PX_PER_M = (1080 / 19.4) * 100;
-const DELTA_T = 0.01; //s
+const DELTA_T = 1 / 120; //s
 const ZOOM_RATIO = 100;
 
 class Vector {
@@ -44,7 +44,7 @@ class Vector {
 	};
 }
 
-class node {
+class matter {
 	constructor(dim, R, V, m, minR, maxR, CANVAS) {
 		this.dim = dim;
 		//[R, V, m]
@@ -56,9 +56,8 @@ class node {
 		this.minR = new Vector(minR).mulk(ZOOM_RATIO / PX_PER_M);
 		this.maxR = new Vector(maxR).mulk(ZOOM_RATIO / PX_PER_M);
 		this.forceList = new Array();
-
 		this.CANVAS = CANVAS;
-		this.disp();
+
 		this.itv = setInterval(this.Next, DELTA_T * 1000);
 	}
 
@@ -69,7 +68,6 @@ class node {
 	dv_dt = (t, X) => {
 		let F = new Vector(new Array(this.dim).fill(0));
 		for (let everyF of this.forceList) F = F.add(everyF(t, X, this.m));
-		console.log(F.dat);
 		for (let i = 0; i < X.dat[0].dim; i++)
 			if (X.dat[0].dat[i] < this.minR.dat[i])
 				F.dat[i] += (this.minR.dat[i] - X.dat[0].dat[i]) * 1000;
@@ -105,20 +103,6 @@ class node {
 		this.t += DELTA_T;
 	};
 
-	disp = () => {
-		this.circ(this.X.dat[0].dat[0] * PX_PER_M / ZOOM_RATIO, this.X.dat[0].dat[1] * PX_PER_M / ZOOM_RATIO, 1.0)
-	};
-
-	circ = (x, y, r) => {
-        this.CANVAS.lineWidth = 1;
-        this.CANVAS.lineCap = "round";
-		this.CANVAS.beginPath();
-		this.CANVAS.arc(x, y, r, 0, 2 * Math.PI);
-		this.CANVAS.closePath();
-		this.CANVAS.strokeStyle = "black";
-		this.CANVAS.stroke();
-	}
-
 	isOut = () => {
 		for (let i = 0; i < this.dim; i++)
 			if (
@@ -137,7 +121,7 @@ class node {
 	Next = () => {
 		this.sim();
 		//this.checkOut();
-		this.disp();
+		//this.disp();
 	};
 }
 
@@ -147,11 +131,19 @@ const Gravity_Y = (t, X, m) => {
 	return G;
 };
 
-const Tension = (R, l) => (t, X, m) => {
-	let tie = R.mulk(ZOOM_RATIO);
+//important: transfer address argument
+const Spring = (Point, l) => (t, X, m) => {
+	let tie = Point.X.dat[0];
 	let len = l * ZOOM_RATIO;
 	let dis = tie.sub(X.dat[0]);
-	return dis.mulk((dis.abs() - len) * 100);
+	return dis.mulk((dis.abs() - len) * 10000);
+};
+
+const Rope = (Point, l) => (t, X, m) => {
+	let tie = Point.X.dat[0];
+	let len = l * ZOOM_RATIO;
+	let dis = tie.sub(X.dat[0]);
+	return dis.mulk((dis.abs() > len ? (dis.abs() - len) : 0) * 3000);
 };
 
 class space {
@@ -167,30 +159,104 @@ class space {
 		this.DOM.style.left = "0px";
 		this.DOM.width = this.x = x;
 		this.DOM.height = this.y = y;
-		this.DOM.style.border = "dashed 2px #CCC";
+		this.DOM.style.border = "dashed 2px #FAA";
 		this.DOM.style.background = "#EEE";
+		this.CANVAS = this.DOM.getContext("2d");
+		this.points = new Array();
+
+		this.borderX1 = (this.x * 1) / 10;
+		this.borderY1 = (this.y * 1) / 10;
+		this.borderX2 = (this.x * 9) / 10;
+		this.borderY2 = (this.y * 9) / 10;
 
 		this.dim = 2;
-		let point1 = new node(
-			this.dim,
-			new Array(0.02, 0.02), //R: m
-			new Array(0.1, -0.01), //V: m/s
-			1, //m: kg
-			new Array(0, 0), //minR: px
-			new Array(this.x, this.y), //maxR: px
-			this.DOM.getContext("2d")
+		this.addPoint([0.07, 0.05], [0, 0], 1);
+		this.addPoint([0.05, 0.05], [0, 0], 1);
+		this.addPoint([0.05, 0.03], [0, 0], 1);
+		this.points[1].addForce(Gravity_Y);
+		this.points[1].addForce(Rope(this.points[0], 0.02));
+		this.points[2].addForce(Gravity_Y);
+		this.points[1].addForce(Rope(this.points[2], 0.02));
+		this.points[2].addForce(Rope(this.points[1], 0.02));
+
+		this.itv = setInterval(this.disp, DELTA_T);
+	};
+
+	addPoint = (R, V, m) => {
+		this.points.push(
+			new matter(
+				this.dim,
+				R, //R: m
+				V, //V: m/s
+				m, //m: kg
+				new Array(this.borderX1, this.borderY1), //minR: px
+				new Array(this.borderX2, this.borderY2), //maxR: px
+				this.CANVAS
+			)
 		);
-		let point2 = new node(
-			this.dim,
-			new Array(0.05, 0.03),
-			new Array(0, 0),
-			1,
-			new Array(0, 0),
-			new Array(this.x, this.y),
-			this.DOM.getContext("2d")
+	};
+
+	line = (p1, p2) => {
+		this.CANVAS.lineWidth = 2;
+		this.CANVAS.lineCap = "round";
+		this.CANVAS.setLineDash([10, 0]);
+		this.CANVAS.beginPath();
+		this.CANVAS.moveTo(
+			(p1.X.dat[0].dat[0] * PX_PER_M) / ZOOM_RATIO,
+			(p1.X.dat[0].dat[1] * PX_PER_M) / ZOOM_RATIO
 		);
-		point1.addForce(Gravity_Y);
-		point1.addForce(Tension(new Vector(new Array(0.05, 0.03)), 0.02));
+		this.CANVAS.lineTo(
+			(p2.X.dat[0].dat[0] * PX_PER_M) / ZOOM_RATIO,
+			(p2.X.dat[0].dat[1] * PX_PER_M) / ZOOM_RATIO
+		);
+		this.CANVAS.closePath();
+		this.CANVAS.strokeStyle = "#A64";
+		this.CANVAS.stroke();
+	};
+
+	rect = (x1, y1, x2, y2) => {
+		this.CANVAS.lineWidth = 2;
+		this.CANVAS.lineCap = "round";
+		this.CANVAS.setLineDash([5, 5]);
+		this.CANVAS.beginPath();
+		this.CANVAS.moveTo(x1, y1);
+		this.CANVAS.lineTo(x1, y2);
+		this.CANVAS.lineTo(x2, y2);
+		this.CANVAS.lineTo(x2, y1);
+		this.CANVAS.lineTo(x1, y1);
+		this.CANVAS.closePath();
+		this.CANVAS.strokeStyle = "#AAF";
+		this.CANVAS.stroke();
+	};
+
+	circ = (x, y, r, d) => {
+		this.CANVAS.lineWidth = d;
+		this.CANVAS.lineCap = "round";
+		this.CANVAS.setLineDash([10, 0]);
+		this.CANVAS.beginPath();
+		this.CANVAS.arc(x, y, r, 0, 2 * Math.PI);
+		this.CANVAS.closePath();
+		this.CANVAS.strokeStyle = "black";
+		this.CANVAS.stroke();
+	};
+
+	drawPt = (Point) => {
+		this.circ(
+			(Point.X.dat[0].dat[0] * PX_PER_M) / ZOOM_RATIO,
+			(Point.X.dat[0].dat[1] * PX_PER_M) / ZOOM_RATIO,
+			2.0,
+			4.0
+		);
+	};
+
+	disp = () => {
+		this.CANVAS.clearRect(0, 0, this.x, this.y);
+		this.rect(this.borderX1, this.borderY1, this.borderX2, this.borderY2);
+		this.line(this.points[0], this.points[1]);
+		this.line(this.points[1], this.points[2]);
+		this.drawPt(this.points[1]);
+		this.drawPt(this.points[2]);
+		//this.drawPt(this.points[1]);
 	};
 }
 
