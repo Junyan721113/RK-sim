@@ -56,18 +56,25 @@ class matter {
 		this.minR = new Vector(minR).mulk(ZOOM_RATIO / PX_PER_M);
 		this.maxR = new Vector(maxR).mulk(ZOOM_RATIO / PX_PER_M);
 		this.forceList = new Array();
+		this.calForce = new Array();
 		this.CANVAS = CANVAS;
 
 		this.itv = setInterval(this.Next, DELTA_T * 1000);
 	}
 
-	addForce = (F) => {
+	pointAddForce = (F) => {
 		this.forceList.push(F);
+		return this.forceList.length - 1;
 	};
 
 	dv_dt = (t, X) => {
 		let F = new Vector(new Array(this.dim).fill(0));
-		for (let everyF of this.forceList) F = F.add(everyF(t, X, this.m));
+		this.calForce = new Array();
+		for (let everyF of this.forceList) {
+			let calF = everyF(t, X, this.m);
+			this.calForce.push(calF);
+			F = F.add(calF);
+		}
 		for (let i = 0; i < X.dat[0].dim; i++)
 			if (X.dat[0].dat[i] < this.minR.dat[i])
 				F.dat[i] += (this.minR.dat[i] - X.dat[0].dat[i]) * 1000;
@@ -148,12 +155,19 @@ const Rope = (Point, l, k) => (t, X, m) => {
 	);
 };
 
-const Swing = (A, omega, theta) => (t, X, m) => {
+const Swing = (A, omega, phi, theta) => (t, X, m) => {
 	let T = new Vector(new Array(X.dat[0].dim).fill(0));
-	T.dat[0] = A * Math.cos(omega * t) * Math.cos(theta);
-	T.dat[1] = A * Math.cos(omega * t) * Math.sin(theta);
+	T.dat[0] = A * Math.cos(omega * t + phi) * Math.cos(theta);
+	T.dat[1] = A * Math.cos(omega * t + phi) * Math.sin(theta);
 	return T;
-}
+};
+
+const Circle = (A, omega, phi) => (t, X, m) => {
+	let T = new Vector(new Array(X.dat[0].dim).fill(0));
+	T.dat[0] = A * Math.cos(omega * t + phi);
+	T.dat[1] = A * Math.sin(omega * t + phi);
+	return T;
+};
 
 class space {
 	constructor(x, y) {
@@ -173,6 +187,7 @@ class space {
 		this.CANVAS = this.DOM.getContext("2d");
 		this.points = new Array();
 		this.edges = new Array();
+		this.forces = new Array();
 
 		this.borderX1 = (this.x * 1) / 10;
 		this.borderY1 = (this.y * 1) / 10;
@@ -185,16 +200,16 @@ class space {
 		this.addPoint([0.07, 0.05], [0, 0], 1);
 		this.addPoint([0.05, 0.05], [0, 0], 1);
 		this.addPoint([0.05, 0.03], [0, 0], 1);
-		this.points[1].addForce(Gravity_Y);
-		this.points[1].addForce(Rope(this.points[0], 0.02));
-		this.points[2].addForce(Gravity_Y);
-		this.points[1].addForce(Rope(this.points[2], 0.02));
-		this.points[2].addForce(Rope(this.points[1], 0.02));
+		this.points[1].pointAddForce(Gravity_Y);
+		this.points[1].pointAddForce(Rope(this.points[0], 0.02));
+		this.points[2].pointAddForce(Gravity_Y);
+		this.points[1].pointAddForce(Rope(this.points[2], 0.02));
+		this.points[2].pointAddForce(Rope(this.points[1], 0.02));
 		*/
 
 		for (let i = 0; i < 15; i++) {
 			for (let j = 0; j < 10; j++) {
-				this.addPoint([j * 0.01 + 0.027, i * 0.003 + 0.02], [0, 0], 1);
+				this.addPoint([j * 0.01 + 0.027, i * 0.003 + 0.02], [0, 0], 0.001);
 			}
 		}
 
@@ -211,35 +226,44 @@ class space {
 			for (let j = 0; j < 10; j++) {
 				if (i == 0 && j == 0) continue;
 				if (i == 0 && j == 9) continue;
-				if (i == 10 && j == 9) this.points[i * 10 + j].addForce(Swing(1000, 10, 0));
+				if (i == 11 && j == 8)
+					this.addForce(this.points[i * 10 + j], Circle(1, 5, 0), true);
 
-				this.points[i * 10 + j].addForce(Gravity_Y);
+				this.addForce(this.points[i * 10 + j], Gravity_Y, false);
 
 				if (i + 1 < 15) {
 					//this.addEdge(this.points[i * 10 + j], this.points[(i + 1) * 10 + j]);
-					this.points[i * 10 + j].addForce(
-						Rope(this.points[(i + 1) * 10 + j], 0.005, 10)
+					this.addForce(
+						this.points[i * 10 + j],
+						Rope(this.points[(i + 1) * 10 + j], 0.005, 0.01),
+						false
 					);
 				}
 
 				if (i - 1 >= 0) {
 					//this.addEdge(this.points[i * 10 + j], this.points[(i - 1) * 10 + j]);
-					this.points[i * 10 + j].addForce(
-						Rope(this.points[(i - 1) * 10 + j], 0.005, 10)
+					this.addForce(
+						this.points[i * 10 + j],
+						Rope(this.points[(i - 1) * 10 + j], 0.005, 0.01),
+						false
 					);
 				}
 
 				if (j + 1 < 10) {
 					//this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j + 1]);
-					this.points[i * 10 + j].addForce(
-						Rope(this.points[i * 10 + j + 1], 0.005, 10)
+					this.addForce(
+						this.points[i * 10 + j],
+						Rope(this.points[i * 10 + j + 1], 0.005, 0.01),
+						false
 					);
 				}
 
 				if (j - 1 >= 0) {
 					//this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j - 1]);
-					this.points[i * 10 + j].addForce(
-						Rope(this.points[i * 10 + j - 1], 0.005, 10)
+					this.addForce(
+						this.points[i * 10 + j],
+						Rope(this.points[i * 10 + j - 1], 0.005, 0.01),
+						false
 					);
 				}
 			}
@@ -267,6 +291,11 @@ class space {
 		this.edges.push([Pt1, Pt2]);
 	};
 
+	addForce = (Pt, Force, isDisp) => {
+		let forceNum = Pt.pointAddForce(Force);
+		if (isDisp) this.forces.push([Pt, forceNum]);
+	};
+
 	line = (p1, p2) => {
 		this.CANVAS.lineWidth = 2;
 		this.CANVAS.lineCap = "round";
@@ -282,6 +311,24 @@ class space {
 		);
 		this.CANVAS.closePath();
 		this.CANVAS.strokeStyle = "#A64";
+		this.CANVAS.stroke();
+	};
+
+	lineLen = (pt, l) => {
+		this.CANVAS.lineWidth = 2;
+		this.CANVAS.lineCap = "round";
+		this.CANVAS.setLineDash([10, 0]);
+		this.CANVAS.beginPath();
+		this.CANVAS.moveTo(
+			(pt.X.dat[0].dat[0] * PX_PER_M) / ZOOM_RATIO,
+			(pt.X.dat[0].dat[1] * PX_PER_M) / ZOOM_RATIO
+		);
+		this.CANVAS.lineTo(
+			((pt.X.dat[0].dat[0] + l.dat[0]) * PX_PER_M) / ZOOM_RATIO,
+			((pt.X.dat[0].dat[1] + l.dat[1]) * PX_PER_M) / ZOOM_RATIO
+		);
+		this.CANVAS.closePath();
+		this.CANVAS.strokeStyle = "#884";
 		this.CANVAS.stroke();
 	};
 
@@ -325,6 +372,9 @@ class space {
 		this.rect(this.borderX1, this.borderY1, this.borderX2, this.borderY2);
 		for (let edge of this.edges) this.line(edge[0], edge[1]);
 		for (let point of this.points) this.drawPt(point);
+		for (let force of this.forces)
+			this.lineLen(force[0], force[0].calForce[force[1]].mulk(0.1));
+
 		/*
 		this.line(this.points[0], this.points[1]);
 		this.line(this.points[1], this.points[2]);
