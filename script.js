@@ -1,6 +1,6 @@
 const PX_PER_M = (1080 / 19.4) * 100;
-const DELTA_T = 1 / 120; //s
-const ZOOM_RATIO = 100;
+const DELTA_T = 1 / 240; //s
+const ZOOM_RATIO = 10;
 
 class Vector {
 	constructor(Arr) {
@@ -132,19 +132,28 @@ const Gravity_Y = (t, X, m) => {
 };
 
 //important: transfer address argument
-const Spring = (Point, l) => (t, X, m) => {
+const Spring = (Point, l, k) => (t, X, m) => {
 	let tie = Point.X.dat[0];
 	let len = l * ZOOM_RATIO;
 	let dis = tie.sub(X.dat[0]);
-	return dis.mulk((dis.abs() - len) * 10000);
+	return dis.mulk((dis.abs() - len) * k * Math.pow(1000 / ZOOM_RATIO, 2));
 };
 
-const Rope = (Point, l) => (t, X, m) => {
+const Rope = (Point, l, k) => (t, X, m) => {
 	let tie = Point.X.dat[0];
 	let len = l * ZOOM_RATIO;
 	let dis = tie.sub(X.dat[0]);
-	return dis.mulk((dis.abs() > len ? (dis.abs() - len) : 0) * 3000);
+	return dis.mulk(
+		(dis.abs() > len ? dis.abs() - len : 0) * k * Math.pow(1000 / ZOOM_RATIO, 2)
+	);
 };
+
+const Swing = (A, omega, theta) => (t, X, m) => {
+	let T = new Vector(new Array(X.dat[0].dim).fill(0));
+	T.dat[0] = A * Math.cos(omega * t) * Math.cos(theta);
+	T.dat[1] = A * Math.cos(omega * t) * Math.sin(theta);
+	return T;
+}
 
 class space {
 	constructor(x, y) {
@@ -163,6 +172,7 @@ class space {
 		this.DOM.style.background = "#EEE";
 		this.CANVAS = this.DOM.getContext("2d");
 		this.points = new Array();
+		this.edges = new Array();
 
 		this.borderX1 = (this.x * 1) / 10;
 		this.borderY1 = (this.y * 1) / 10;
@@ -170,6 +180,8 @@ class space {
 		this.borderY2 = (this.y * 9) / 10;
 
 		this.dim = 2;
+
+		/*
 		this.addPoint([0.07, 0.05], [0, 0], 1);
 		this.addPoint([0.05, 0.05], [0, 0], 1);
 		this.addPoint([0.05, 0.03], [0, 0], 1);
@@ -178,8 +190,62 @@ class space {
 		this.points[2].addForce(Gravity_Y);
 		this.points[1].addForce(Rope(this.points[2], 0.02));
 		this.points[2].addForce(Rope(this.points[1], 0.02));
+		*/
 
-		this.itv = setInterval(this.disp, DELTA_T);
+		for (let i = 0; i < 15; i++) {
+			for (let j = 0; j < 10; j++) {
+				this.addPoint([j * 0.01 + 0.027, i * 0.003 + 0.02], [0, 0], 1);
+			}
+		}
+
+		for (let i = 0; i < 15; i++) {
+			for (let j = 0; j < 10; j++) {
+				if (i + 1 < 15)
+					this.addEdge(this.points[i * 10 + j], this.points[(i + 1) * 10 + j]);
+				if (j + 1 < 10)
+					this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j + 1]);
+			}
+		}
+
+		for (let i = 0; i < 15; i++) {
+			for (let j = 0; j < 10; j++) {
+				if (i == 0 && j == 0) continue;
+				if (i == 0 && j == 9) continue;
+				if (i == 10 && j == 9) this.points[i * 10 + j].addForce(Swing(1000, 10, 0));
+
+				this.points[i * 10 + j].addForce(Gravity_Y);
+
+				if (i + 1 < 15) {
+					//this.addEdge(this.points[i * 10 + j], this.points[(i + 1) * 10 + j]);
+					this.points[i * 10 + j].addForce(
+						Rope(this.points[(i + 1) * 10 + j], 0.005, 10)
+					);
+				}
+
+				if (i - 1 >= 0) {
+					//this.addEdge(this.points[i * 10 + j], this.points[(i - 1) * 10 + j]);
+					this.points[i * 10 + j].addForce(
+						Rope(this.points[(i - 1) * 10 + j], 0.005, 10)
+					);
+				}
+
+				if (j + 1 < 10) {
+					//this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j + 1]);
+					this.points[i * 10 + j].addForce(
+						Rope(this.points[i * 10 + j + 1], 0.005, 10)
+					);
+				}
+
+				if (j - 1 >= 0) {
+					//this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j - 1]);
+					this.points[i * 10 + j].addForce(
+						Rope(this.points[i * 10 + j - 1], 0.005, 10)
+					);
+				}
+			}
+		}
+
+		this.itv = setInterval(this.disp, DELTA_T * 1000 * 4);
 	};
 
 	addPoint = (R, V, m) => {
@@ -194,6 +260,11 @@ class space {
 				this.CANVAS
 			)
 		);
+		return this.points.length - 1;
+	};
+
+	addEdge = (Pt1, Pt2) => {
+		this.edges.push([Pt1, Pt2]);
 	};
 
 	line = (p1, p2) => {
@@ -236,7 +307,7 @@ class space {
 		this.CANVAS.beginPath();
 		this.CANVAS.arc(x, y, r, 0, 2 * Math.PI);
 		this.CANVAS.closePath();
-		this.CANVAS.strokeStyle = "black";
+		this.CANVAS.strokeStyle = "#A88";
 		this.CANVAS.stroke();
 	};
 
@@ -244,22 +315,26 @@ class space {
 		this.circ(
 			(Point.X.dat[0].dat[0] * PX_PER_M) / ZOOM_RATIO,
 			(Point.X.dat[0].dat[1] * PX_PER_M) / ZOOM_RATIO,
-			2.0,
-			4.0
+			1.0,
+			2.0
 		);
 	};
 
 	disp = () => {
 		this.CANVAS.clearRect(0, 0, this.x, this.y);
 		this.rect(this.borderX1, this.borderY1, this.borderX2, this.borderY2);
+		for (let edge of this.edges) this.line(edge[0], edge[1]);
+		for (let point of this.points) this.drawPt(point);
+		/*
 		this.line(this.points[0], this.points[1]);
 		this.line(this.points[1], this.points[2]);
 		this.drawPt(this.points[1]);
 		this.drawPt(this.points[2]);
+		*/
 		//this.drawPt(this.points[1]);
 	};
 }
 
 onload = () => {
-	let back = new space(800, 640);
+	let back = new space(800, 800);
 };
