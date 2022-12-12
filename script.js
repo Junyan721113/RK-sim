@@ -227,7 +227,7 @@ class space {
 				if (i == 0 && j == 0) continue;
 				if (i == 0 && j == 9) continue;
 				if (i == 11 && j == 8)
-					this.addForce(this.points[i * 10 + j], Circle(1, 5, 0), true);
+					this.addForce(this.points[i * 10 + j], Circle(1, -5, 0), true);
 
 				this.addForce(this.points[i * 10 + j], Gravity_Y, false);
 
