@@ -1,6 +1,6 @@
 const PX_PER_M = (1080 / 19.4) * 100;
 const DELTA_T = 1 / 240; //s
-const ZOOM_RATIO = 10;
+const ZOOM_RATIO = 5;
 
 class Vector {
 	constructor(Arr) {
@@ -209,7 +209,7 @@ class space {
 
 		for (let i = 0; i < 15; i++) {
 			for (let j = 0; j < 10; j++) {
-				this.addPoint([j * 0.01 + 0.027, i * 0.003 + 0.02], [0, 0], 0.001);
+				this.addPoint([j * 0.004 + 0.05, i * 0.003 + 0.02], [0, 0], 0.001);
 			}
 		}
 
@@ -226,8 +226,9 @@ class space {
 			for (let j = 0; j < 10; j++) {
 				if (i == 0 && j == 0) continue;
 				if (i == 0 && j == 9) continue;
+				if (i == 0 && j == 4) continue;
 				if (i == 11 && j == 8)
-					this.addForce(this.points[i * 10 + j], Circle(1, -5, 0), true);
+					this.addForce(this.points[i * 10 + j], Swing(1, -10, 0, 0), true);
 
 				this.addForce(this.points[i * 10 + j], Gravity_Y, false);
 
@@ -235,7 +236,7 @@ class space {
 					//this.addEdge(this.points[i * 10 + j], this.points[(i + 1) * 10 + j]);
 					this.addForce(
 						this.points[i * 10 + j],
-						Rope(this.points[(i + 1) * 10 + j], 0.005, 0.01),
+						Rope(this.points[(i + 1) * 10 + j], 0.003, 0.01),
 						false
 					);
 				}
@@ -244,7 +245,7 @@ class space {
 					//this.addEdge(this.points[i * 10 + j], this.points[(i - 1) * 10 + j]);
 					this.addForce(
 						this.points[i * 10 + j],
-						Rope(this.points[(i - 1) * 10 + j], 0.005, 0.01),
+						Rope(this.points[(i - 1) * 10 + j], 0.003, 0.01),
 						false
 					);
 				}
@@ -253,7 +254,7 @@ class space {
 					//this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j + 1]);
 					this.addForce(
 						this.points[i * 10 + j],
-						Rope(this.points[i * 10 + j + 1], 0.005, 0.01),
+						Rope(this.points[i * 10 + j + 1], 0.003, 0.01),
 						false
 					);
 				}
@@ -262,7 +263,7 @@ class space {
 					//this.addEdge(this.points[i * 10 + j], this.points[i * 10 + j - 1]);
 					this.addForce(
 						this.points[i * 10 + j],
-						Rope(this.points[i * 10 + j - 1], 0.005, 0.01),
+						Rope(this.points[i * 10 + j - 1], 0.003, 0.01),
 						false
 					);
 				}
@@ -373,7 +374,7 @@ class space {
 		for (let edge of this.edges) this.line(edge[0], edge[1]);
 		for (let point of this.points) this.drawPt(point);
 		for (let force of this.forces)
-			this.lineLen(force[0], force[0].calForce[force[1]].mulk(0.1));
+			this.lineLen(force[0], force[0].calForce[force[1]].mulk(ZOOM_RATIO / 100));
 
 		/*
 		this.line(this.points[0], this.points[1]);
